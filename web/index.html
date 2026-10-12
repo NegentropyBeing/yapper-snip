@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>yapper-snip</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>yapper-snip</h1>
+    <p>Cut a clean 3–10 s voice reference from a video.</p>
+  </header>
+
+  <main>
+    <section id="source">
+      <h2>1. Source</h2>
+      <div class="row">
+        <input id="url" type="url" placeholder="https://www.youtube.com/watch?v=…" spellcheck="false">
+        <button id="probe">Load</button>
+      </div>
+      <p id="video-info" class="muted"></p>
+      <div id="player-wrap" hidden>
+        <div id="player"></div>
+        <div class="row">
+          <button id="mark-start" class="secondary">Set start from player</button>
+          <button id="mark-end" class="secondary">Set end from player</button>
+        </div>
+      </div>
+      <div class="row fields">
+        <label>Start <input id="start" placeholder="0:03" inputmode="decimal"></label>
+        <label>End <input id="end" placeholder="0:15" inputmode="decimal"></label>
+        <label>Padding (s) <input id="padding" type="number" min="0" max="60" step="1"></label>
+        <button id="fetch">Fetch audio</button>
+      </div>
+      <div id="job" hidden>
+        <progress id="job-progress" max="1" value="0"></progress>
+        <span id="job-message" class="muted"></span>
+      </div>
+      <p id="source-error" class="error"></p>
+      <details id="recent">
+        <summary>Recent clips</summary>
+        <ul id="recent-list"></ul>
+      </details>
+    </section>
+
+    <section id="output">
+      <h2>2. Output folder</h2>
+      <div class="row">
+        <input id="output-dir" placeholder="Choose where exported snippets are saved" spellcheck="false">
+        <button id="pick-folder" class="secondary">Browse…</button>
+      </div>
+    </section>
+
+    <section id="trim" hidden>
+      <h2>3. Trim</h2>
+      <p id="clip-title" class="muted"></p>
+      <div id="waveform"></div>
+      <div class="row">
+        <button id="play">Play selection</button>
+        <label class="check"><input id="loop" type="checkbox" checked> Loop</label>
+        <label class="grow">Zoom <input id="zoom" type="range" min="0" max="100" value="0"></label>
+        <span id="variants" class="toggle" hidden>
+          <button data-variant="original" class="secondary active">Original</button>
+          <button data-variant="clean" class="secondary">Clean</button>
+        </span>
+      </div>
+      <div class="row fields">
+        <label>Start (s)
+          <span class="nudge">
+            <button data-nudge="start" data-by="-0.01" class="secondary">−</button>
+            <input id="sel-start" type="number" step="0.001" min="0">
+            <button data-nudge="start" data-by="0.01" class="secondary">+</button>
+          </span>
+        </label>
+        <label>End (s)
+          <span class="nudge">
+            <button data-nudge="end" data-by="-0.01" class="secondary">−</button>
+            <input id="sel-end" type="number" step="0.001" min="0">
+            <button data-nudge="end" data-by="0.01" class="secondary">+</button>
+          </span>
+        </label>
+        <span id="sel-duration" class="badge"></span>
+        <span id="sel-peak" class="badge"></span>
+      </div>
+      <p class="muted">Drag the edges of the highlighted region. Space plays the selection; − / + move an edge by 10 ms.</p>
+    </section>
+
+    <section id="export" hidden>
+      <h2>4. Export</h2>
+      <div class="row fields">
+        <label class="grow">File name <input id="name" spellcheck="false"></label>
+        <label>Sample rate
+          <select id="sample-rate">
+            <option value="24000">24 kHz</option>
+            <option value="16000">16 kHz</option>
+            <option value="44100">44.1 kHz</option>
+            <option value="">Keep 48 kHz</option>
+          </select>
+        </label>
+        <label class="check"><input id="mono" type="checkbox"> Mono</label>
+        <label class="check"><input id="fade" type="checkbox"> 5 ms fades</label>
+        <label class="check"><input id="normalize" type="checkbox"> Normalize peak</label>
+      </div>
+      <label><span>Transcript (saved next to the WAV as .txt, used as OmniVoice <code>ref_text</code>)</span>
+        <textarea id="transcript" rows="2" placeholder="Optional: the exact words spoken in the selection"></textarea>
+      </label>
+      <div class="row">
+        <button id="export-btn">Export snippet</button>
+        <span id="export-result"></span>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
