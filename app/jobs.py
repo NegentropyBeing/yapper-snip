@@ -49,6 +49,11 @@ def submit(kind: str, fn: Callable[[Job], dict | None]) -> Job:
     return job
 
 
+def active() -> int:
+    with _lock:
+        return sum(job.status in ("queued", "running") for job in _jobs.values())
+
+
 def get(job_id: str) -> Job | None:
     with _lock:
         return _jobs.get(job_id)

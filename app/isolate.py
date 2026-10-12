@@ -20,6 +20,14 @@ STEPS = {
 gpu_lock = threading.Lock()
 
 
+def purge_models() -> dict:
+    """Delete every downloaded model; they are fetched again on next use."""
+    from . import clips
+
+    with gpu_lock:
+        return clips.empty_folder(MODELS_DIR)
+
+
 def available() -> bool:
     return importlib.util.find_spec("audio_separator") is not None
 

@@ -16,6 +16,11 @@ DEFAULTS = {
     "normalize": False,
 }
 
+# Exit code the server uses to ask the launcher (python -m app) for a restart.
+EXIT_RESTART = 3
+HOST = "127.0.0.1"
+PORT = 8765
+
 # Longest window fetched in one go; the work WAV is decoded in the browser.
 MAX_WINDOW_SECONDS = 600
 

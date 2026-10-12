@@ -58,6 +58,52 @@ def test_export_writes_wav_and_transcript(client, tmp_path):
     assert second["path"].endswith("voz-2.wav")
 
 
+ADMIN = {"X-Yapper": "1"}
+
+
+def test_admin_routes_need_header(client):
+    for action in ("purge-cache", "purge-models", "stop", "restart"):
+        assert client.post(f"/api/admin/{action}", json={}).status_code == 403
+    assert client.get(f"/api/clips/{CLIP_ID}").status_code == 200
+
+
+def test_purge_cache_and_purge_models_are_separate(client, tmp_path, monkeypatch, tone):  # noqa: F811
+    models = tmp_path / "models"
+    (models / "whisper").mkdir(parents=True)
+    (models / "whisper" / "m.pt").write_bytes(b"x" * 100)
+    monkeypatch.setattr(main.isolate, "MODELS_DIR", models)
+
+    freed = client.post("/api/admin/purge-cache", headers=ADMIN).json()["freed_bytes"]
+    assert freed > 100
+    assert client.get("/api/clips").json() == []
+    assert (models / "whisper" / "m.pt").exists()
+
+    clip = clips.WORK_DIR / CLIP_ID
+    clip.mkdir()
+    (clip / "meta.json").write_text(json.dumps({"id": CLIP_ID, "created": 1}))
+    assert client.post("/api/admin/purge-models", headers=ADMIN).json() == {"freed_bytes": 100}
+    assert list(models.iterdir()) == []
+    assert client.get(f"/api/clips/{CLIP_ID}").status_code == 200
+
+
+def test_purge_refused_while_job_runs(client, monkeypatch):
+    monkeypatch.setattr(main.jobs, "active", lambda: 1)
+    assert client.post("/api/admin/purge-cache", headers=ADMIN).status_code == 409
+    assert client.post("/api/admin/purge-models", headers=ADMIN).status_code == 409
+    assert client.get(f"/api/clips/{CLIP_ID}").status_code == 200
+
+
+def test_stop_and_restart(client, monkeypatch):
+    codes = []
+    monkeypatch.setattr(main, "_exit_soon", codes.append)
+    monkeypatch.delenv("YAPPER_SUPERVISED", raising=False)
+    assert client.post("/api/admin/restart", headers=ADMIN).status_code == 409
+    monkeypatch.setenv("YAPPER_SUPERVISED", "1")
+    assert client.post("/api/admin/restart", headers=ADMIN).status_code == 200
+    assert client.post("/api/admin/stop", headers=ADMIN).status_code == 200
+    assert codes == [main.EXIT_RESTART, 0]
+
+
 def test_unknown_clip_and_traversal(client):
     assert client.get("/api/clips/ffffffffffff").status_code == 404
     assert client.get("/api/clips/..%2F..%2Fx/audio").status_code == 404

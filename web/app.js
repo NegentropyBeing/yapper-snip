@@ -451,6 +451,72 @@ $('transcribe-btn').addEventListener('click', async () => {
   }
 });
 
+/* ---------- maintenance ---------- */
+
+function admin(action) {
+  return fetch(`/api/admin/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Yapper': '1' },
+    body: '{}',
+  }).then(async (res) => {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail ?? `Request failed (${res.status})`);
+    return data;
+  });
+}
+
+function maintenanceStatus(text, isError = false) {
+  $('maintenance-status').className = isError ? 'error' : 'muted';
+  $('maintenance-status').textContent = text;
+}
+
+$('purge-cache-btn').addEventListener('click', async () => {
+  if (!confirm('Delete all downloaded clips? Exported snippets in your output folder are not touched.')) return;
+  try {
+    const result = await admin('purge-cache');
+    closeClip();
+    refreshRecent();
+    maintenanceStatus(`Cache purged, ${(result.freed_bytes / 1e6).toFixed(1)} MB freed.`);
+  } catch (err) {
+    maintenanceStatus(err.message, true);
+  }
+});
+
+$('purge-models-btn').addEventListener('click', async () => {
+  if (!confirm('Delete all downloaded models? They are several GB and are downloaded again the next time you run cleanup or a transcript draft.')) return;
+  try {
+    const result = await admin('purge-models');
+    maintenanceStatus(`Models purged, ${(result.freed_bytes / 1e6).toFixed(1)} MB freed.`);
+  } catch (err) {
+    maintenanceStatus(err.message, true);
+  }
+});
+
+$('restart-btn').addEventListener('click', async () => {
+  try {
+    await admin('restart');
+  } catch (err) {
+    return maintenanceStatus(err.message, true);
+  }
+  maintenanceStatus('Restarting…');
+  await new Promise((r) => setTimeout(r, 1000));
+  for (let i = 0; i < 60; i++) {
+    if (await fetch('/api/settings').then((res) => res.ok, () => false)) return location.reload();
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  maintenanceStatus('The app did not come back. Start it again from the terminal.', true);
+});
+
+$('stop-btn').addEventListener('click', async () => {
+  if (!confirm('Stop the app? You will need the terminal to start it again.')) return;
+  try {
+    await admin('stop');
+    document.querySelector('main').innerHTML = '<section><h2>App stopped</h2><p class="muted">Start it again with <code>uv run python -m app</code>, then reload this page.</p></section>';
+  } catch (err) {
+    maintenanceStatus(err.message, true);
+  }
+});
+
 /* ---------- export ---------- */
 
 $('export-btn').addEventListener('click', async () => {

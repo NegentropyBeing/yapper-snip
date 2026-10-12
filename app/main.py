@@ -1,13 +1,15 @@
+import os
 import subprocess
 import sys
+import threading
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import audio, clips, isolate, jobs, transcribe, ytdlp_service
-from .config import WEB_DIR, load_settings, save_settings
+from .config import EXIT_RESTART, WEB_DIR, load_settings, save_settings
 
 app = FastAPI(title="yapper-snip")
 
@@ -201,6 +203,46 @@ def pick_folder() -> dict:
     if not path:
         return {"output_dir": load_settings()["output_dir"], "cancelled": True}
     return {**save_settings({"output_dir": path.replace("/", "\\") if sys.platform == "win32" else path}), "cancelled": False}
+
+
+def _admin(x_yapper: str | None = Header(default=None)) -> None:
+    # A custom header keeps other web pages from triggering these with a plain form post.
+    if x_yapper != "1":
+        raise HTTPException(status_code=403, detail="Missing X-Yapper header")
+
+
+def _exit_soon(code: int) -> None:
+    # Leave time for the response to reach the client.
+    threading.Timer(0.3, os._exit, args=(code,)).start()
+
+
+def _no_active_jobs() -> None:
+    if jobs.active():
+        raise HTTPException(status_code=409, detail="A job is still running; wait for it or restart the app first")
+
+
+@app.post("/api/admin/purge-cache", dependencies=[Depends(_admin), Depends(_no_active_jobs)])
+def purge_cache() -> dict:
+    return clips.purge()
+
+
+@app.post("/api/admin/purge-models", dependencies=[Depends(_admin), Depends(_no_active_jobs)])
+def purge_models() -> dict:
+    return isolate.purge_models()
+
+
+@app.post("/api/admin/stop", dependencies=[Depends(_admin)])
+def stop_app() -> dict:
+    _exit_soon(0)
+    return {"stopping": True}
+
+
+@app.post("/api/admin/restart", dependencies=[Depends(_admin)])
+def restart_app() -> dict:
+    if os.environ.get("YAPPER_SUPERVISED") != "1":
+        raise HTTPException(status_code=409, detail="Restart needs the launcher: start the app with 'uv run python -m app'")
+    _exit_soon(EXIT_RESTART)
+    return {"restarting": True}
 
 
 app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
