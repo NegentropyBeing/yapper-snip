@@ -19,11 +19,11 @@ uv sync --extra ml     # também limpeza de voz e rascunhos de transcrição (v�
 uv run python -m app
 ```
 
-Depois abra http://127.0.0.1:8765.
+Depois abra http://127.0.0.1:8765. A interface está disponível em português e inglês; troque pelo botão **PT / EN** no topo da página.
 
 ## Manutenção
 
-Na seção **Maintenance**, no fim da página, ou pelo terminal:
+Na seção **Manutenção**, no fim da página, ou pelo terminal:
 
 ```
 uv run python -m app purge-cache    # apaga todos os clipes baixados
@@ -36,11 +36,11 @@ Nenhuma das limpezas toca nos trechos exportados nem na pasta de saída. As duas
 
 ## Fluxo de uso
 
-1. **Source (origem)**: cole o link e defina início e fim aproximados. O áudio é baixado com alguns segundos de folga de cada lado.
-2. **Output folder (pasta de saída)**: escolha onde os trechos serão salvos. A exportação fica desativada até isso ser definido.
-3. **Trim (corte)**: arraste as bordas da região na forma de onda até o início e o fim exatos. O corte tem precisão de amostra.
-4. **Clean (limpeza, opcional)**: remova música, reverberação ou ruído e compare Original e Clean.
-5. **Export (exportação)**: grava um WAV e, opcionalmente, uma transcrição `.txt` com o mesmo nome.
+1. **Origem**: cole o link e defina início e fim aproximados. O áudio é baixado com alguns segundos de folga de cada lado.
+2. **Pasta de saída**: escolha onde os trechos serão salvos. A exportação fica desativada até isso ser definido.
+3. **Corte**: arraste as bordas da região na forma de onda até o início e o fim exatos. O corte tem precisão de amostra.
+4. **Limpeza (opcional)**: remova música, reverberação ou ruído e compare Original e Limpo.
+5. **Exportação**: grava um WAV e, opcionalmente, uma transcrição `.txt` com o mesmo nome.
 
 ## O que faz uma boa referência para o OmniVoice
 
@@ -85,7 +85,7 @@ uv sync --extra ml     # also voice cleanup and transcript drafts (several GB)
 uv run python -m app
 ```
 
-Then open http://127.0.0.1:8765.
+Then open http://127.0.0.1:8765. The interface is available in Portuguese and English; switch with the **PT / EN** button at the top of the page.
 
 ### Maintenance
 

@@ -1,6 +1,7 @@
 import WaveSurfer from './vendor/wavesurfer.esm.js';
 import Regions from './vendor/regions.esm.js';
 import Timeline from './vendor/timeline.esm.js';
+import { applyStatic, getLang, serverText, setLang, t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,6 +21,7 @@ const state = {
   region: null,
   playingSelection: false,
   player: null,
+  info: null,
 };
 
 async function api(path, options = {}) {
@@ -28,7 +30,7 @@ async function api(path, options = {}) {
   }
   const res = await fetch(path, options);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `Request failed (${res.status})`);
+  if (!res.ok) throw new Error(typeof data.detail === 'string' ? serverText(data.detail) : t('requestFailed', { status: res.status }));
   return data;
 }
 
@@ -57,7 +59,7 @@ async function loadSettings() {
 function setOutputDir(dir) {
   $('output-dir').value = dir;
   $('export-btn').disabled = !dir;
-  $('export-btn').title = dir ? '' : 'Choose an output folder first';
+  $('export-btn').title = dir ? '' : t('chooseOutputFirst');
 }
 
 function saveSettings(changes) {
@@ -73,7 +75,7 @@ $('output-dir').addEventListener('change', async () => {
 $('pick-folder').addEventListener('click', async () => {
   $('pick-folder').disabled = true;
   try {
-    setOutputDir((await api('/api/pick-folder', { method: 'POST' })).output_dir);
+    setOutputDir((await api('/api/pick-folder', { method: 'POST', body: { title: t('pickFolderTitle') } })).output_dir);
   } catch (err) {
     alert(err.message);
   } finally {
@@ -109,15 +111,22 @@ async function showPlayer(videoId) {
   }
 }
 
+function renderVideoInfo() {
+  const info = state.info;
+  if (info) $('video-info').textContent = `${info.title} · ${info.uploader ?? t('unknownUploader')} · ${clock(info.duration)}`;
+}
+
 async function probe() {
   const url = $('url').value.trim();
   if (!url) return;
   $('source-error').textContent = '';
-  $('video-info').textContent = 'Loading…';
+  state.info = null;
+  $('video-info').textContent = t('loading');
   $('probe').disabled = true;
   try {
     const info = await api('/api/probe', { method: 'POST', body: { url } });
-    $('video-info').textContent = `${info.title} · ${info.uploader ?? 'unknown'} · ${clock(info.duration)}`;
+    state.info = info;
+    renderVideoInfo();
     if (info.extractor === 'Youtube') await showPlayer(info.video_id);
     else $('player-wrap').hidden = true;
   } catch (err) {
@@ -144,14 +153,14 @@ async function pollJob(job, render) {
     await new Promise((r) => setTimeout(r, 400));
     job = await api(`/api/jobs/${job.id}`);
   }
-  if (job.status === 'error') throw new Error(job.error);
+  if (job.status === 'error') throw new Error(serverText(job.error));
   return job.result;
 }
 
 function renderDownload(job) {
   $('job').hidden = false;
   $('job-progress').value = job.progress;
-  $('job-message').textContent = job.message;
+  $('job-message').textContent = serverText(job.message);
 }
 
 $('fetch').addEventListener('click', async () => {
@@ -186,11 +195,11 @@ async function refreshRecent() {
     label.textContent = `${clip.title} · ${clock(clip.window_start)}–${clock(clip.window_end)}`;
     const open = document.createElement('button');
     open.className = 'secondary';
-    open.textContent = 'Open';
+    open.textContent = t('open');
     open.addEventListener('click', () => openClip(clip.id));
     const del = document.createElement('button');
     del.className = 'secondary';
-    del.textContent = 'Delete';
+    del.textContent = t('delete');
     del.addEventListener('click', async () => {
       await api(`/api/clips/${clip.id}`, { method: 'DELETE' });
       if (state.clip?.id === clip.id) closeClip();
@@ -251,9 +260,13 @@ function ensureWaveSurfer() {
     if ($('loop').checked) state.ws.play();
     else stopSelection();
   });
-  state.ws.on('play', () => { $('play').textContent = 'Pause'; });
-  state.ws.on('pause', () => { $('play').textContent = 'Play selection'; });
-  state.ws.on('error', (err) => { $('clip-title').textContent = `Could not load audio: ${err?.message ?? err}`; });
+  state.ws.on('play', renderPlay);
+  state.ws.on('pause', renderPlay);
+  state.ws.on('error', (err) => { $('clip-title').textContent = t('audioLoadFailed', { error: err?.message ?? err }); });
+}
+
+function renderPlay() {
+  $('play').textContent = t(state.ws?.isPlaying() ? 'pause' : 'play');
 }
 
 function stopSelection() {
@@ -302,7 +315,7 @@ function renderSelection(withPeak = true) {
   const badge = $('sel-duration');
   const ok = length >= MIN_LEN && length <= MAX_LEN;
   badge.className = `badge ${ok ? 'good' : 'warn'}`;
-  badge.textContent = `${length.toFixed(3)} s` + (ok ? '' : length < MIN_LEN ? ' · shorter than 3 s' : ' · longer than 10 s');
+  badge.textContent = `${length.toFixed(3)} s` + (ok ? '' : ` · ${t(length < MIN_LEN ? 'tooShort' : 'tooLong')}`);
 
   if (!withPeak) return;
   const db = selectionPeakDb();
@@ -311,10 +324,10 @@ function renderSelection(withPeak = true) {
     peak.textContent = '';
   } else if (db >= CLIP_DBFS) {
     peak.className = 'badge bad';
-    peak.textContent = `peak ${db.toFixed(1)} dBFS · clipping`;
+    peak.textContent = `${t('peak')} ${db.toFixed(1)} dBFS · ${t('clipping')}`;
   } else {
     peak.className = 'badge';
-    peak.textContent = `peak ${Number.isFinite(db) ? db.toFixed(1) : '−∞'} dBFS`;
+    peak.textContent = `${t('peak')} ${Number.isFinite(db) ? db.toFixed(1) : '−∞'} dBFS`;
   }
 }
 
@@ -364,6 +377,12 @@ function defaultName(clip) {
   return base.slice(0, 40) || 'snippet';
 }
 
+function renderClipTitle() {
+  const clip = state.clip;
+  const range = `${clock(clip.window_start)}–${clock(clip.window_end)}`;
+  $('clip-title').textContent = `${clip.title} · ${t('ofVideo', { range })}`;
+}
+
 async function openClip(id) {
   const clip = await api(`/api/clips/${id}`);
   state.clip = clip;
@@ -373,7 +392,7 @@ async function openClip(id) {
   $('export').hidden = false;
   $('clean-status').textContent = '';
   $('transcribe-status').textContent = '';
-  $('clip-title').textContent = `${clip.title} · ${clock(clip.window_start)}–${clock(clip.window_end)} of the video`;
+  renderClipTitle();
   $('name').value = defaultName(clip);
   $('transcript').value = '';
   $('export-result').textContent = '';
@@ -410,16 +429,16 @@ $('clean-btn').addEventListener('click', async () => {
   const status = $('clean-status');
   status.className = 'muted';
   if (steps.length === 0) {
-    status.textContent = 'Tick at least one step.';
+    status.textContent = t('tickStep');
     return;
   }
   const clipId = state.clip.id;
   $('clean-btn').disabled = true;
   try {
     const job = await api(`/api/clips/${clipId}/isolate`, { method: 'POST', body: { steps } });
-    await pollJob(job, (j) => { status.textContent = j.message || 'Starting… (the first run downloads the models)'; });
+    await pollJob(job, (j) => { status.textContent = serverText(j.message) || t('cleanStarting'); });
     if (state.clip?.id !== clipId) return;
-    status.textContent = 'Done. Now showing the cleaned audio; switch back with the Original button.';
+    status.textContent = t('cleanDone');
     $('variants').hidden = false;
     loadVariant('clean');
   } catch (err) {
@@ -433,7 +452,7 @@ $('clean-btn').addEventListener('click', async () => {
 $('transcribe-btn').addEventListener('click', async () => {
   const status = $('transcribe-status');
   status.className = 'muted';
-  status.textContent = 'Transcribing… (the first run downloads the model)';
+  status.textContent = t('transcribing');
   $('transcribe-btn').disabled = true;
   try {
     const job = await api(`/api/clips/${state.clip.id}/transcribe`, {
@@ -442,7 +461,7 @@ $('transcribe-btn').addEventListener('click', async () => {
     });
     const result = await pollJob(job, () => {});
     $('transcript').value = result.text;
-    status.textContent = 'Draft ready. Check it against the audio before exporting.';
+    status.textContent = t('draftReady');
   } catch (err) {
     status.className = 'error';
     status.textContent = err.message;
@@ -460,7 +479,7 @@ function admin(action) {
     body: '{}',
   }).then(async (res) => {
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail ?? `Request failed (${res.status})`);
+    if (!res.ok) throw new Error(serverText(data.detail) ?? t('requestFailed', { status: res.status }));
     return data;
   });
 }
@@ -471,22 +490,22 @@ function maintenanceStatus(text, isError = false) {
 }
 
 $('purge-cache-btn').addEventListener('click', async () => {
-  if (!confirm('Delete all downloaded clips? Exported snippets in your output folder are not touched.')) return;
+  if (!confirm(t('purgeCacheConfirm'))) return;
   try {
     const result = await admin('purge-cache');
     closeClip();
     refreshRecent();
-    maintenanceStatus(`Cache purged, ${(result.freed_bytes / 1e6).toFixed(1)} MB freed.`);
+    maintenanceStatus(t('cachePurged', { mb: (result.freed_bytes / 1e6).toFixed(1) }));
   } catch (err) {
     maintenanceStatus(err.message, true);
   }
 });
 
 $('purge-models-btn').addEventListener('click', async () => {
-  if (!confirm('Delete all downloaded models? They are several GB and are downloaded again the next time you run cleanup or a transcript draft.')) return;
+  if (!confirm(t('purgeModelsConfirm'))) return;
   try {
     const result = await admin('purge-models');
-    maintenanceStatus(`Models purged, ${(result.freed_bytes / 1e6).toFixed(1)} MB freed.`);
+    maintenanceStatus(t('modelsPurged', { mb: (result.freed_bytes / 1e6).toFixed(1) }));
   } catch (err) {
     maintenanceStatus(err.message, true);
   }
@@ -498,20 +517,21 @@ $('restart-btn').addEventListener('click', async () => {
   } catch (err) {
     return maintenanceStatus(err.message, true);
   }
-  maintenanceStatus('Restarting…');
+  maintenanceStatus(t('restarting'));
   await new Promise((r) => setTimeout(r, 1000));
   for (let i = 0; i < 60; i++) {
     if (await fetch('/api/settings').then((res) => res.ok, () => false)) return location.reload();
     await new Promise((r) => setTimeout(r, 500));
   }
-  maintenanceStatus('The app did not come back. Start it again from the terminal.', true);
+  maintenanceStatus(t('notBack'), true);
 });
 
 $('stop-btn').addEventListener('click', async () => {
-  if (!confirm('Stop the app? You will need the terminal to start it again.')) return;
+  if (!confirm(t('stopConfirm'))) return;
   try {
     await admin('stop');
-    document.querySelector('main').innerHTML = '<section><h2>App stopped</h2><p class="muted">Start it again with <code>uv run python -m app</code>, then reload this page.</p></section>';
+    document.querySelector('main').innerHTML = '<section><h2 data-i18n="stoppedTitle"></h2><p class="muted" data-i18n-html="stoppedBody"></p></section>';
+    applyStatic();
   } catch (err) {
     maintenanceStatus(err.message, true);
   }
@@ -522,7 +542,7 @@ $('stop-btn').addEventListener('click', async () => {
 $('export-btn').addEventListener('click', async () => {
   const result = $('export-result');
   result.className = '';
-  result.textContent = 'Exporting…';
+  result.textContent = t('exporting');
   $('export-btn').disabled = true;
   try {
     const out = await api(`/api/clips/${state.clip.id}/export`, {
@@ -540,7 +560,7 @@ $('export-btn').addEventListener('click', async () => {
       },
     });
     result.className = 'ok';
-    result.textContent = `Saved ${out.path} · ${out.duration.toFixed(3)} s · ${out.sample_rate / 1000} kHz · ${out.channels === 1 ? 'mono' : 'stereo'}`;
+    result.textContent = `${t('saved', { path: out.path })} · ${out.duration.toFixed(3)} s · ${out.sample_rate / 1000} kHz · ${t(out.channels === 1 ? 'monoOut' : 'stereoOut')}`;
   } catch (err) {
     result.className = 'fail';
     result.textContent = err.message;
@@ -549,6 +569,31 @@ $('export-btn').addEventListener('click', async () => {
   }
 });
 
+/* ---------- language ---------- */
+
+function renderLanguage() {
+  applyStatic();
+  for (const button of document.querySelectorAll('[data-lang]')) {
+    button.classList.toggle('active', button.dataset.lang === getLang());
+  }
+  if (!$('play')) return; // the app was stopped and the page replaced
+  $('export-btn').title = $('output-dir').value ? '' : t('chooseOutputFirst');
+  renderPlay();
+  renderVideoInfo();
+  if (state.clip) {
+    renderClipTitle();
+    renderSelection();
+  }
+  refreshRecent();
+}
+
+for (const button of document.querySelectorAll('[data-lang]')) {
+  button.addEventListener('click', () => {
+    setLang(button.dataset.lang);
+    renderLanguage();
+  });
+}
+
+renderLanguage();
 loadSettings();
 loadCapabilities();
-refreshRecent();

@@ -14,11 +14,11 @@ from .config import EXIT_RESTART, WEB_DIR, load_settings, save_settings
 app = FastAPI(title="yapper-snip")
 
 _PICK_FOLDER = """
-import tkinter, tkinter.filedialog
+import sys, tkinter, tkinter.filedialog
 root = tkinter.Tk()
 root.withdraw()
 root.attributes("-topmost", True)
-print(tkinter.filedialog.askdirectory(parent=root, title="Output folder", initialdir=__import__("sys").argv[1] or None))
+print(tkinter.filedialog.askdirectory(parent=root, title=sys.argv[2], initialdir=sys.argv[1] or None))
 """
 
 
@@ -53,6 +53,10 @@ class TranscribeRequest(BaseModel):
     start: float
     end: float
     variant: str = "original"
+
+
+class PickFolderRequest(BaseModel):
+    title: str = "Output folder"
 
 
 class SettingsUpdate(BaseModel):
@@ -191,10 +195,10 @@ def put_settings(update: SettingsUpdate) -> dict:
 
 
 @app.post("/api/pick-folder")
-def pick_folder() -> dict:
+def pick_folder(req: PickFolderRequest) -> dict:
     # Tk wants the main thread, so the dialog runs in its own process.
     proc = subprocess.run(
-        [sys.executable, "-X", "utf8", "-c", _PICK_FOLDER, load_settings()["output_dir"]],
+        [sys.executable, "-X", "utf8", "-c", _PICK_FOLDER, load_settings()["output_dir"], req.title],
         capture_output=True, text=True, encoding="utf-8",
     )
     if proc.returncode != 0:

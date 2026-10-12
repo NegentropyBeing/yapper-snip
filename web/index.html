@@ -9,30 +9,36 @@
 </head>
 <body>
   <header>
-    <h1>yapper-snip</h1>
-    <p>Cut a clean 3–10 s voice reference from a video.</p>
+    <div>
+      <h1>yapper-snip</h1>
+      <p data-i18n="tagline">Cut a clean 3–10 s voice reference from a video.</p>
+    </div>
+    <span id="lang" class="toggle" role="group" aria-label="Language / Idioma">
+      <button data-lang="pt" class="secondary" title="Português">PT</button>
+      <button data-lang="en" class="secondary" title="English">EN</button>
+    </span>
   </header>
 
   <main>
     <section id="source">
-      <h2>1. Source</h2>
+      <h2 data-i18n="sourceTitle">1. Source</h2>
       <div class="row">
         <input id="url" type="url" placeholder="https://www.youtube.com/watch?v=…" spellcheck="false">
-        <button id="probe">Load</button>
+        <button id="probe" data-i18n="load">Load</button>
       </div>
       <p id="video-info" class="muted"></p>
       <div id="player-wrap" hidden>
         <div id="player"></div>
         <div class="row">
-          <button id="mark-start" class="secondary">Set start from player</button>
-          <button id="mark-end" class="secondary">Set end from player</button>
+          <button id="mark-start" class="secondary" data-i18n="markStart">Set start from player</button>
+          <button id="mark-end" class="secondary" data-i18n="markEnd">Set end from player</button>
         </div>
       </div>
       <div class="row fields">
-        <label>Start <input id="start" placeholder="0:03" inputmode="decimal"></label>
-        <label>End <input id="end" placeholder="0:15" inputmode="decimal"></label>
-        <label>Padding (s) <input id="padding" type="number" min="0" max="60" step="1"></label>
-        <button id="fetch">Fetch audio</button>
+        <label><span data-i18n="start">Start</span> <input id="start" placeholder="0:03" inputmode="decimal"></label>
+        <label><span data-i18n="end">End</span> <input id="end" placeholder="0:15" inputmode="decimal"></label>
+        <label><span data-i18n="padding">Padding (s)</span> <input id="padding" type="number" min="0" max="60" step="1"></label>
+        <button id="fetch" data-i18n="fetch">Fetch audio</button>
       </div>
       <div id="job" hidden>
         <progress id="job-progress" max="1" value="0"></progress>
@@ -40,41 +46,41 @@
       </div>
       <p id="source-error" class="error"></p>
       <details id="recent">
-        <summary>Recent clips</summary>
+        <summary data-i18n="recent">Recent clips</summary>
         <ul id="recent-list"></ul>
       </details>
     </section>
 
     <section id="output">
-      <h2>2. Output folder</h2>
+      <h2 data-i18n="outputTitle">2. Output folder</h2>
       <div class="row">
-        <input id="output-dir" placeholder="Choose where exported snippets are saved" spellcheck="false">
-        <button id="pick-folder" class="secondary">Browse…</button>
+        <input id="output-dir" placeholder="Choose where exported snippets are saved" data-i18n-placeholder="outputPlaceholder" spellcheck="false">
+        <button id="pick-folder" class="secondary" data-i18n="browse">Browse…</button>
       </div>
     </section>
 
     <section id="trim" hidden>
-      <h2>3. Trim</h2>
+      <h2 data-i18n="trimTitle">3. Trim</h2>
       <p id="clip-title" class="muted"></p>
       <div id="waveform"></div>
       <div class="row">
         <button id="play">Play selection</button>
-        <label class="check"><input id="loop" type="checkbox" checked> Loop</label>
-        <label class="grow">Zoom <input id="zoom" type="range" min="0" max="100" value="0"></label>
+        <label class="check"><input id="loop" type="checkbox" checked> <span data-i18n="loop">Loop</span></label>
+        <label class="grow"><span data-i18n="zoom">Zoom</span> <input id="zoom" type="range" min="0" max="100" value="0"></label>
         <span id="variants" class="toggle" hidden>
-          <button data-variant="original" class="secondary active">Original</button>
-          <button data-variant="clean" class="secondary">Clean</button>
+          <button data-variant="original" class="secondary active" data-i18n="original">Original</button>
+          <button data-variant="clean" class="secondary" data-i18n="cleanVariant">Clean</button>
         </span>
       </div>
       <div class="row fields">
-        <label>Start (s)
+        <label><span data-i18n="startSeconds">Start (s)</span>
           <span class="nudge">
             <button data-nudge="start" data-by="-0.01" class="secondary">−</button>
             <input id="sel-start" type="number" step="0.001" min="0">
             <button data-nudge="start" data-by="0.01" class="secondary">+</button>
           </span>
         </label>
-        <label>End (s)
+        <label><span data-i18n="endSeconds">End (s)</span>
           <span class="nudge">
             <button data-nudge="end" data-by="-0.01" class="secondary">−</button>
             <input id="sel-end" type="number" step="0.001" min="0">
@@ -84,59 +90,59 @@
         <span id="sel-duration" class="badge"></span>
         <span id="sel-peak" class="badge"></span>
       </div>
-      <p class="muted">Drag the edges of the highlighted region. Space plays the selection; − / + move an edge by 10 ms.</p>
+      <p class="muted" data-i18n="trimHint">Drag the edges of the highlighted region. Space plays the selection; − / + move an edge by 10 ms.</p>
     </section>
 
     <section id="clean" hidden>
-      <h2>4. Clean (optional)</h2>
-      <p class="muted">OmniVoice copes with mild noise by itself, so leave this off for already clean speech. Use the lightest step that fixes the problem, then compare Original and Clean by ear.</p>
+      <h2 data-i18n="cleanTitle">4. Clean (optional)</h2>
+      <p class="muted" data-i18n="cleanHint">OmniVoice copes with mild noise by itself, so leave this off for already clean speech. Use the lightest step that fixes the problem, then compare Original and Clean by ear.</p>
       <div id="clean-controls" class="row">
-        <label class="check"><input type="checkbox" data-step="vocals"> Remove music and background</label>
-        <label class="check"><input type="checkbox" data-step="dereverb"> Reduce reverb</label>
-        <label class="check"><input type="checkbox" data-step="denoise"> Reduce noise</label>
-        <button id="clean-btn">Run cleanup</button>
+        <label class="check"><input type="checkbox" data-step="vocals"> <span data-i18n="stepVocals">Remove music and background</span></label>
+        <label class="check"><input type="checkbox" data-step="dereverb"> <span data-i18n="stepDereverb">Reduce reverb</span></label>
+        <label class="check"><input type="checkbox" data-step="denoise"> <span data-i18n="stepDenoise">Reduce noise</span></label>
+        <button id="clean-btn" data-i18n="runCleanup">Run cleanup</button>
         <span id="clean-status" class="muted"></span>
       </div>
-      <p id="clean-missing" class="muted" hidden>Voice cleanup is not installed. Run <code>uv sync --extra ml</code> and restart the app.</p>
+      <p id="clean-missing" class="muted" data-i18n-html="cleanMissing" hidden>Voice cleanup is not installed. Run <code>uv sync --extra ml</code> and restart the app.</p>
     </section>
 
     <section id="export" hidden>
-      <h2>5. Export</h2>
+      <h2 data-i18n="exportTitle">5. Export</h2>
       <div class="row fields">
-        <label class="grow">File name <input id="name" spellcheck="false"></label>
-        <label>Sample rate
+        <label class="grow"><span data-i18n="fileName">File name</span> <input id="name" spellcheck="false"></label>
+        <label><span data-i18n="sampleRate">Sample rate</span>
           <select id="sample-rate">
             <option value="24000">24 kHz</option>
             <option value="16000">16 kHz</option>
             <option value="44100">44.1 kHz</option>
-            <option value="">Keep 48 kHz</option>
+            <option value="" data-i18n="keep48">Keep 48 kHz</option>
           </select>
         </label>
-        <label class="check"><input id="mono" type="checkbox"> Mono</label>
-        <label class="check"><input id="fade" type="checkbox"> 5 ms fades</label>
-        <label class="check"><input id="normalize" type="checkbox"> Normalize peak</label>
+        <label class="check"><input id="mono" type="checkbox"> <span data-i18n="mono">Mono</span></label>
+        <label class="check"><input id="fade" type="checkbox"> <span data-i18n="fades">5 ms fades</span></label>
+        <label class="check"><input id="normalize" type="checkbox"> <span data-i18n="normalize">Normalize peak</span></label>
       </div>
-      <label><span>Transcript (saved next to the WAV as .txt, used as OmniVoice <code>ref_text</code>)</span>
-        <textarea id="transcript" rows="2" placeholder="Optional: the exact words spoken in the selection"></textarea>
+      <label><span data-i18n-html="transcriptLabel">Transcript (saved next to the WAV as .txt, used as OmniVoice <code>ref_text</code>)</span>
+        <textarea id="transcript" rows="2" placeholder="Optional: the exact words spoken in the selection" data-i18n-placeholder="transcriptPlaceholder"></textarea>
       </label>
       <div class="row">
-        <button id="transcribe-btn" class="secondary">Draft transcript from selection</button>
+        <button id="transcribe-btn" class="secondary" data-i18n="draftTranscript">Draft transcript from selection</button>
         <span id="transcribe-status" class="muted"></span>
       </div>
       <div class="row">
-        <button id="export-btn">Export snippet</button>
+        <button id="export-btn" data-i18n="exportButton">Export snippet</button>
         <span id="export-result"></span>
       </div>
     </section>
     <section id="maintenance">
-      <h2>Maintenance</h2>
+      <h2 data-i18n="maintenanceTitle">Maintenance</h2>
       <div class="row">
-        <button id="purge-cache-btn" class="secondary">Purge cache</button>
-        <button id="purge-models-btn" class="secondary">Purge models</button>
+        <button id="purge-cache-btn" class="secondary" data-i18n="purgeCache">Purge cache</button>
+        <button id="purge-models-btn" class="secondary" data-i18n="purgeModels">Purge models</button>
       </div>
       <div class="row">
-        <button id="restart-btn" class="secondary">Restart app</button>
-        <button id="stop-btn" class="secondary">Stop app</button>
+        <button id="restart-btn" class="secondary" data-i18n="restart">Restart app</button>
+        <button id="stop-btn" class="secondary" data-i18n="stop">Stop app</button>
         <span id="maintenance-status" class="muted"></span>
       </div>
     </section>
