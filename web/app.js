@@ -569,6 +569,15 @@ $('export-btn').addEventListener('click', async () => {
   }
 });
 
+/* ---------- presence ---------- */
+
+// The server shuts itself down once no page has pinged it for a while.
+const pageId = crypto.randomUUID();
+const ping = () => fetch(`/api/presence/${pageId}`, { method: 'POST', keepalive: true }).catch(() => {});
+setInterval(ping, 5000);
+window.addEventListener('pageshow', ping);
+window.addEventListener('pagehide', () => navigator.sendBeacon(`/api/presence/${pageId}/bye`));
+
 /* ---------- language ---------- */
 
 function renderLanguage() {

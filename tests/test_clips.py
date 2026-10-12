@@ -104,6 +104,24 @@ def test_stop_and_restart(client, monkeypatch):
     assert codes == [main.EXIT_RESTART, 0]
 
 
+def test_idle_only_after_last_page_leaves(client, monkeypatch):
+    presence = main.presence
+    monkeypatch.setattr(presence, "_pages", {})
+    monkeypatch.setattr(presence, "_seen", False)
+    monkeypatch.setattr(presence, "_empty_since", None)
+    assert not presence.idle(1000)  # never opened in a browser
+
+    presence.touch("a", now=0)
+    presence.touch("b", now=0)
+    assert client.post("/api/presence/a/bye").status_code == 204
+    assert not presence.idle(1)
+    assert not presence.idle(presence.TIMEOUT + 1)  # b stopped pinging
+    assert presence.idle(presence.TIMEOUT + 1 + presence.GRACE)
+
+    assert client.post("/api/presence/c").status_code == 204  # reload
+    assert not presence.idle(presence.TIMEOUT + 1 + presence.GRACE)
+
+
 def test_unknown_clip_and_traversal(client):
     assert client.get("/api/clips/ffffffffffff").status_code == 404
     assert client.get("/api/clips/..%2F..%2Fx/audio").status_code == 404

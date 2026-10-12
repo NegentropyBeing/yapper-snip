@@ -1,17 +1,28 @@
+import logging
 import os
 import subprocess
 import sys
 import threading
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import audio, clips, isolate, jobs, transcribe, ytdlp_service
+from . import audio, clips, isolate, jobs, presence, transcribe, ytdlp_service
 from .config import EXIT_RESTART, WEB_DIR, load_settings, save_settings
 
-app = FastAPI(title="yapper-snip")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # The pages ping every few seconds; keep that out of the access log.
+    logging.getLogger("uvicorn.access").addFilter(lambda record: "/api/presence/" not in record.getMessage())
+    threading.Thread(target=presence.watch, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="yapper-snip", lifespan=lifespan)
 
 _PICK_FOLDER = """
 import sys, tkinter, tkinter.filedialog
@@ -207,6 +218,16 @@ def pick_folder(req: PickFolderRequest) -> dict:
     if not path:
         return {"output_dir": load_settings()["output_dir"], "cancelled": True}
     return {**save_settings({"output_dir": path.replace("/", "\\") if sys.platform == "win32" else path}), "cancelled": False}
+
+
+@app.post("/api/presence/{page_id}", status_code=204)
+def page_open(page_id: str) -> None:
+    presence.touch(page_id)
+
+
+@app.post("/api/presence/{page_id}/bye", status_code=204)
+def page_closed(page_id: str) -> None:
+    presence.leave(page_id)
 
 
 def _admin(x_yapper: str | None = Header(default=None)) -> None:
