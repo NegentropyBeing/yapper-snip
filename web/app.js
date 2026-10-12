@@ -138,17 +138,20 @@ for (const [button, field] of [['mark-start', 'start'], ['mark-end', 'end']]) {
   });
 }
 
-async function pollJob(job) {
-  $('job').hidden = false;
+async function pollJob(job, render) {
   while (job.status === 'queued' || job.status === 'running') {
-    $('job-progress').value = job.progress;
-    $('job-message').textContent = job.message;
+    render(job);
     await new Promise((r) => setTimeout(r, 400));
     job = await api(`/api/jobs/${job.id}`);
   }
-  $('job').hidden = true;
   if (job.status === 'error') throw new Error(job.error);
   return job.result;
+}
+
+function renderDownload(job) {
+  $('job').hidden = false;
+  $('job-progress').value = job.progress;
+  $('job-message').textContent = job.message;
 }
 
 $('fetch').addEventListener('click', async () => {
@@ -161,13 +164,13 @@ $('fetch').addEventListener('click', async () => {
       method: 'POST',
       body: { url, start: $('start').value, end: $('end').value, padding: Number($('padding').value) },
     });
-    const result = await pollJob(job);
+    const result = await pollJob(job, renderDownload);
     await openClip(result.clip_id);
     refreshRecent();
   } catch (err) {
-    $('job').hidden = true;
     $('source-error').textContent = err.message;
   } finally {
+    $('job').hidden = true;
     $('fetch').disabled = false;
   }
 });
@@ -366,7 +369,10 @@ async function openClip(id) {
   state.clip = clip;
   state.sel = { start: clip.sel_start, end: clip.sel_end };
   $('trim').hidden = false;
+  $('clean').hidden = false;
   $('export').hidden = false;
+  $('clean-status').textContent = '';
+  $('transcribe-status').textContent = '';
   $('clip-title').textContent = `${clip.title} · ${clock(clip.window_start)}–${clock(clip.window_end)} of the video`;
   $('name').value = defaultName(clip);
   $('transcript').value = '';
@@ -382,12 +388,68 @@ function closeClip() {
   state.clip = null;
   state.ws?.empty();
   $('trim').hidden = true;
+  $('clean').hidden = true;
   $('export').hidden = true;
 }
 
 for (const button of document.querySelectorAll('[data-variant]')) {
   button.addEventListener('click', () => loadVariant(button.dataset.variant));
 }
+
+/* ---------- clean and transcript ---------- */
+
+async function loadCapabilities() {
+  const caps = await api('/api/capabilities');
+  $('clean-controls').hidden = !caps.isolate;
+  $('clean-missing').hidden = caps.isolate;
+  $('transcribe-btn').hidden = !caps.transcribe;
+}
+
+$('clean-btn').addEventListener('click', async () => {
+  const steps = [...document.querySelectorAll('[data-step]:checked')].map((box) => box.dataset.step);
+  const status = $('clean-status');
+  status.className = 'muted';
+  if (steps.length === 0) {
+    status.textContent = 'Tick at least one step.';
+    return;
+  }
+  const clipId = state.clip.id;
+  $('clean-btn').disabled = true;
+  try {
+    const job = await api(`/api/clips/${clipId}/isolate`, { method: 'POST', body: { steps } });
+    await pollJob(job, (j) => { status.textContent = j.message || 'Starting… (the first run downloads the models)'; });
+    if (state.clip?.id !== clipId) return;
+    status.textContent = 'Done. Now showing the cleaned audio; switch back with the Original button.';
+    $('variants').hidden = false;
+    loadVariant('clean');
+  } catch (err) {
+    status.className = 'error';
+    status.textContent = err.message;
+  } finally {
+    $('clean-btn').disabled = false;
+  }
+});
+
+$('transcribe-btn').addEventListener('click', async () => {
+  const status = $('transcribe-status');
+  status.className = 'muted';
+  status.textContent = 'Transcribing… (the first run downloads the model)';
+  $('transcribe-btn').disabled = true;
+  try {
+    const job = await api(`/api/clips/${state.clip.id}/transcribe`, {
+      method: 'POST',
+      body: { start: state.sel.start, end: state.sel.end, variant: state.variant },
+    });
+    const result = await pollJob(job, () => {});
+    $('transcript').value = result.text;
+    status.textContent = 'Draft ready. Check it against the audio before exporting.';
+  } catch (err) {
+    status.className = 'error';
+    status.textContent = err.message;
+  } finally {
+    $('transcribe-btn').disabled = false;
+  }
+});
 
 /* ---------- export ---------- */
 
@@ -422,4 +484,5 @@ $('export-btn').addEventListener('click', async () => {
 });
 
 loadSettings();
+loadCapabilities();
 refreshRecent();

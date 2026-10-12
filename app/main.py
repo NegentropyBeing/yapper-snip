@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import audio, clips, jobs, ytdlp_service
+from . import audio, clips, isolate, jobs, transcribe, ytdlp_service
 from .config import WEB_DIR, load_settings, save_settings
 
 app = FastAPI(title="yapper-snip")
@@ -41,6 +41,16 @@ class ExportRequest(BaseModel):
     fade_ms: float = 0
     normalize: bool = False
     transcript: str = ""
+
+
+class IsolateRequest(BaseModel):
+    steps: list[str]
+
+
+class TranscribeRequest(BaseModel):
+    start: float
+    end: float
+    variant: str = "original"
 
 
 class SettingsUpdate(BaseModel):
@@ -125,6 +135,47 @@ def export_clip(clip_id: str, req: ExportRequest) -> dict:
         raise HTTPException(status_code=404, detail="Unknown clip or variant")
     except (ValueError, OSError, audio.AudioError) as exc:
         raise _bad_request(exc)
+
+
+@app.get("/api/capabilities")
+def capabilities() -> dict:
+    return {
+        "isolate": isolate.available(),
+        "isolate_steps": list(isolate.STEPS),
+        "transcribe": transcribe.available(),
+    }
+
+
+@app.post("/api/clips/{clip_id}/isolate")
+def isolate_clip(clip_id: str, req: IsolateRequest) -> dict:
+    try:
+        src = clips.variant_path(clip_id, "original")
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Unknown clip")
+    if not set(req.steps) & set(isolate.STEPS):
+        raise HTTPException(status_code=400, detail="Choose at least one cleanup step")
+
+    def work(job: jobs.Job) -> dict:
+        isolate.run(src, src.with_name("clean.wav"), req.steps, on_progress=job.update)
+        return {"clip_id": clip_id, "steps": req.steps}
+
+    return jobs.submit("isolate", work).to_dict()
+
+
+@app.post("/api/clips/{clip_id}/transcribe")
+def transcribe_clip(clip_id: str, req: TranscribeRequest) -> dict:
+    try:
+        src = clips.variant_path(clip_id, req.variant)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Unknown clip or variant")
+    if req.end <= req.start:
+        raise HTTPException(status_code=400, detail="End must be after start")
+
+    def work(job: jobs.Job) -> dict:
+        job.update(0.1, "Transcribing")
+        return transcribe.run(src, req.start, req.end)
+
+    return jobs.submit("transcribe", work).to_dict()
 
 
 @app.get("/api/settings")
