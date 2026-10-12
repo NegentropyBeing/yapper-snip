@@ -17,9 +17,10 @@ DEFAULTS = {
 }
 
 # Exit code the server uses to ask the launcher (python -m app) for a restart.
-EXIT_RESTART = 3
+# Not 3: uvicorn itself exits with 3 when it cannot start (e.g. the port is taken).
+EXIT_RESTART = 75
 HOST = "127.0.0.1"
-PORT = 8765
+PORT = 8791
 
 # Longest window fetched in one go; the work WAV is decoded in the browser.
 MAX_WINDOW_SECONDS = 600

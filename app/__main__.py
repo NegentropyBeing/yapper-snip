@@ -5,18 +5,45 @@ import json
 import os
 import subprocess
 import sys
+import threading
+import time
 import urllib.error
 import urllib.request
+import webbrowser
 
 from . import clips, isolate
 from .config import EXIT_RESTART, HOST, PORT
 
 
-def serve(host: str, port: int) -> int:
+def is_up(url: str) -> bool:
+    """True when yapper-snip itself, not some other program, answers on url."""
+    try:
+        with urllib.request.urlopen(f"{url}/api/capabilities", timeout=2) as response:
+            return "isolate_steps" in json.load(response)
+    except (OSError, ValueError):
+        return False
+
+
+def open_when_up(url: str) -> None:
+    for _ in range(120):
+        if is_up(url):
+            webbrowser.open(url)
+            return
+        time.sleep(0.5)
+
+
+def serve(host: str, port: int, open_browser: bool = False) -> int:
     """Run the server, starting it again whenever it asks for a restart."""
+    url = f"http://{host}:{port}"
+    if open_browser:
+        if is_up(url):
+            print(f"yapper-snip is already running: {url}")
+            webbrowser.open(url)
+            return 0
+        threading.Thread(target=open_when_up, args=(url,), daemon=True).start()
     env = dict(os.environ, YAPPER_SUPERVISED="1")
     command = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", host, "--port", str(port)]
-    print(f"yapper-snip: http://{host}:{port}")
+    print(f"yapper-snip: {url}")
     while True:
         try:
             code = subprocess.call(command, env=env)
@@ -53,10 +80,11 @@ def main() -> int:
     parser.add_argument("command", nargs="?", default="run", choices=["run", "stop", "restart", *PURGE])
     parser.add_argument("--host", default=HOST)
     parser.add_argument("--port", type=int, default=PORT)
+    parser.add_argument("--open", action="store_true", help="with run: open the page in the default browser")
     args = parser.parse_args()
 
     if args.command == "run":
-        return serve(args.host, args.port)
+        return serve(args.host, args.port, args.open)
 
     try:
         if args.command in PURGE:

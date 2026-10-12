@@ -19,7 +19,9 @@ uv sync --extra ml     # também limpeza de voz e rascunhos de transcrição (v�
 uv run python -m app
 ```
 
-Depois abra http://127.0.0.1:8765. A interface está disponível em português e inglês; troque pelo botão **PT / EN** no topo da página.
+No Windows, basta dar dois cliques em `start.bat`: ele inicia o app e abre a página no navegador padrão. Pelo terminal, `uv run python -m app --open` faz o mesmo; sem `--open`, abra http://127.0.0.1:8791. A interface está disponível em português e inglês; troque pelo botão **PT / EN** no topo da página.
+
+O app encerra sozinho cerca de 10 segundos depois que a última aba é fechada (ou até 90 segundos se o navegador for encerrado à força). Uma tarefa em andamento termina antes. Para usar outra porta: `uv run python -m app --port 9000`.
 
 ## Manutenção
 
@@ -85,7 +87,9 @@ uv sync --extra ml     # also voice cleanup and transcript drafts (several GB)
 uv run python -m app
 ```
 
-Then open http://127.0.0.1:8765. The interface is available in Portuguese and English; switch with the **PT / EN** button at the top of the page.
+On Windows, just double-click `start.bat`: it starts the app and opens the page in your default browser. From a terminal, `uv run python -m app --open` does the same; without `--open`, open http://127.0.0.1:8791 yourself. The interface is available in Portuguese and English; switch with the **PT / EN** button at the top of the page.
+
+The app shuts itself down about 10 seconds after the last tab is closed (or up to 90 seconds if the browser is killed). A running job finishes first. To use another port: `uv run python -m app --port 9000`.
 
 ### Maintenance
 
