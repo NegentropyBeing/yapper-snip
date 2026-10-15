@@ -127,3 +127,9 @@ def test_unknown_clip_and_traversal(client):
     assert client.get("/api/clips/..%2F..%2Fx/audio").status_code == 404
     assert client.get(f"/api/clips/{CLIP_ID}/audio?variant=clean").status_code == 404
     assert client.get(f"/api/clips/{CLIP_ID}/audio").status_code == 200
+
+
+def test_capabilities_lists_features(client):
+    body = client.get("/api/capabilities").json()
+    assert set(body) == {"isolate", "isolate_steps", "transcribe"}
+    assert body["isolate_steps"] == ["vocals", "dereverb", "denoise"]

@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import audio, clips, export, ingest, isolate, jobs, models, presence, transcribe, ytdlp_service
+from . import audio, clips, export, ingest, isolate, jobs, models, presence, tasks, transcribe, ytdlp_service
 from .config import EXIT_RESTART, WEB_DIR, load_settings, save_settings
 
 
@@ -166,33 +166,21 @@ def capabilities() -> dict:
 @app.post("/api/clips/{clip_id}/isolate")
 def isolate_clip(clip_id: str, req: IsolateRequest) -> dict:
     try:
-        src = clips.variant_path(clip_id, "original")
+        return tasks.start_isolate(clip_id, req.steps).to_dict()
     except KeyError:
         raise HTTPException(status_code=404, detail="Unknown clip")
-    if not set(req.steps) & set(isolate.STEPS):
-        raise HTTPException(status_code=400, detail="Choose at least one cleanup step")
-
-    def work(job: jobs.Job) -> dict:
-        isolate.run(src, clips.new_variant_path(clip_id, "clean"), req.steps, on_progress=job.update)
-        return {"clip_id": clip_id, "steps": req.steps}
-
-    return jobs.submit("isolate", work).to_dict()
+    except ValueError as exc:
+        raise _bad_request(exc)
 
 
 @app.post("/api/clips/{clip_id}/transcribe")
 def transcribe_clip(clip_id: str, req: TranscribeRequest) -> dict:
     try:
-        src = clips.variant_path(clip_id, req.variant)
+        return tasks.start_transcribe(clip_id, req.variant, req.start, req.end).to_dict()
     except KeyError:
         raise HTTPException(status_code=404, detail="Unknown clip or variant")
-    if req.end <= req.start:
-        raise HTTPException(status_code=400, detail="End must be after start")
-
-    def work(job: jobs.Job) -> dict:
-        job.update(0.1, "Transcribing")
-        return transcribe.run(src, req.start, req.end)
-
-    return jobs.submit("transcribe", work).to_dict()
+    except ValueError as exc:
+        raise _bad_request(exc)
 
 
 @app.get("/api/settings")
@@ -241,19 +229,22 @@ def _exit_soon(code: int) -> None:
     threading.Timer(0.3, os._exit, args=(code,)).start()
 
 
-def _no_active_jobs() -> None:
-    if jobs.active():
-        raise HTTPException(status_code=409, detail="A job is still running; wait for it or restart the app first")
+def _purge(fn) -> dict:
+    try:
+        with jobs.exclusive():
+            return fn()
+    except jobs.JobsRunning as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
-@app.post("/api/admin/purge-cache", dependencies=[Depends(_admin), Depends(_no_active_jobs)])
+@app.post("/api/admin/purge-cache", dependencies=[Depends(_admin)])
 def purge_cache() -> dict:
-    return clips.purge()
+    return _purge(clips.purge)
 
 
-@app.post("/api/admin/purge-models", dependencies=[Depends(_admin), Depends(_no_active_jobs)])
+@app.post("/api/admin/purge-models", dependencies=[Depends(_admin)])
 def purge_models() -> dict:
-    return models.purge()
+    return _purge(models.purge)
 
 
 @app.post("/api/admin/stop", dependencies=[Depends(_admin)])
