@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 import webbrowser
 
-from . import clips, isolate
+from . import clips, models
 from .config import EXIT_RESTART, HOST, PORT
 
 
@@ -68,7 +68,7 @@ def call(host: str, port: int, action: str) -> dict:
         raise SystemExit(json.load(exc).get("detail", str(exc)))
 
 
-PURGE = {"purge-cache": clips.purge, "purge-models": isolate.purge_models}
+PURGE = {"purge-cache": clips.purge, "purge-models": models.purge}
 
 
 def megabytes(result: dict) -> str:

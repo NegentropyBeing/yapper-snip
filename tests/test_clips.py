@@ -71,7 +71,7 @@ def test_purge_cache_and_purge_models_are_separate(client, tmp_path, monkeypatch
     models = tmp_path / "models"
     (models / "whisper").mkdir(parents=True)
     (models / "whisper" / "m.pt").write_bytes(b"x" * 100)
-    monkeypatch.setattr(main.isolate, "MODELS_DIR", models)
+    monkeypatch.setattr(main.models, "MODELS_DIR", models)
 
     freed = client.post("/api/admin/purge-cache", headers=ADMIN).json()["freed_bytes"]
     assert freed > 100

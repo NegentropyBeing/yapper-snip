@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import audio, clips, isolate, jobs, presence, transcribe, ytdlp_service
+from . import audio, clips, isolate, jobs, models, presence, transcribe, ytdlp_service
 from .config import EXIT_RESTART, WEB_DIR, load_settings, save_settings
 
 
@@ -253,7 +253,7 @@ def purge_cache() -> dict:
 
 @app.post("/api/admin/purge-models", dependencies=[Depends(_admin), Depends(_no_active_jobs)])
 def purge_models() -> dict:
-    return isolate.purge_models()
+    return models.purge()
 
 
 @app.post("/api/admin/stop", dependencies=[Depends(_admin)])

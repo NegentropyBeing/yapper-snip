@@ -1,13 +1,9 @@
 import importlib.util
 import tempfile
-import threading
 from pathlib import Path
 from typing import Callable
 
-from . import audio
-from .config import ROOT
-
-MODELS_DIR = ROOT / "models"
+from . import audio, models
 
 # Applied in this order. Each entry: model file, and the output stem to keep.
 STEPS = {
@@ -15,17 +11,6 @@ STEPS = {
     "dereverb": ("dereverb_mel_band_roformer_less_aggressive_anvuew_sdr_18.8050.ckpt", "noreverb"),
     "denoise": ("denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt", "dry"),
 }
-
-# One model on the GPU at a time.
-gpu_lock = threading.Lock()
-
-
-def purge_models() -> dict:
-    """Delete every downloaded model; they are fetched again on next use."""
-    from . import clips
-
-    with gpu_lock:
-        return clips.empty_folder(MODELS_DIR)
 
 
 def available() -> bool:
@@ -50,9 +35,9 @@ def run(src: Path, dst: Path, steps: list[str], on_progress: Callable[[float, st
 
     from audio_separator.separator import Separator
 
-    with gpu_lock, tempfile.TemporaryDirectory(dir=dst.parent) as tmp:
+    with models.gpu(), tempfile.TemporaryDirectory(dir=dst.parent) as tmp:
         folder = Path(tmp)
-        separator = Separator(output_dir=str(folder), output_format="WAV", model_file_dir=str(MODELS_DIR))
+        separator = Separator(output_dir=str(folder), output_format="WAV", model_file_dir=str(models.MODELS_DIR))
         current = src
         for i, step in enumerate(chosen):
             model, stem = STEPS[step]
