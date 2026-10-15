@@ -12,6 +12,7 @@ dependencies = [
 dev = [
     "httpx>=0.28.1",
     "pytest>=9.1.1",
+    "ruff>=0.17.0",
 ]
 
 [project.optional-dependencies]
@@ -29,3 +30,10 @@ torch = { index = "pytorch-cuda" }
 name = "pytorch-cuda"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
+
+[tool.ruff]
+line-length = 130
+extend-exclude = ["web"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
