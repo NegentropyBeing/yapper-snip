@@ -1,59 +1,41 @@
-"""Tracks the open browser pages so the server can exit once the last one closes."""
+"""Tracks the open browser pages."""
 
-import os
 import threading
 import time
 
-from . import jobs
 
-# Browsers let a background tab ping as rarely as once a minute.
-TIMEOUT = 90.0
-# Covers a reload, where the old page leaves just before the new one arrives.
-GRACE = 10.0
+class Presence:
+    def __init__(self, timeout: float, grace: float) -> None:
+        self.timeout = timeout
+        self.grace = grace
+        self._pages: dict[str, float] = {}
+        self._lock = threading.Lock()
+        self._seen = False  # nothing counts as idle until a page has opened at least once
+        self._empty_since: float | None = None
 
-_pages: dict[str, float] = {}
-_lock = threading.Lock()
-_seen = False  # nothing exits until a page has opened at least once
-_empty_since: float | None = None
+    def touch(self, page_id: str, now: float | None = None) -> None:
+        with self._lock:
+            self._pages[page_id] = time.monotonic() if now is None else now
+            self._seen = True
 
+    def leave(self, page_id: str) -> None:
+        with self._lock:
+            self._pages.pop(page_id, None)
 
-def touch(page_id: str, now: float | None = None) -> None:
-    global _seen
-    with _lock:
-        _pages[page_id] = time.monotonic() if now is None else now
-        _seen = True
+    def refresh(self, now: float) -> None:
+        """Count every open page as just seen, e.g. after the machine slept."""
+        with self._lock:
+            for page_id in self._pages:
+                self._pages[page_id] = now
 
-
-def leave(page_id: str) -> None:
-    with _lock:
-        _pages.pop(page_id, None)
-
-
-def idle(now: float) -> bool:
-    """True once every page that was open has been gone for GRACE seconds."""
-    global _empty_since
-    with _lock:
-        for page_id in [p for p, last in _pages.items() if now - last > TIMEOUT]:
-            del _pages[page_id]
-        if _pages or not _seen:
-            _empty_since = None
-            return False
-        if _empty_since is None:
-            _empty_since = now
-        return now - _empty_since >= GRACE
-
-
-def watch() -> None:
-    last = time.monotonic()
-    while True:
-        time.sleep(1)
-        now = time.monotonic()
-        if now - last > 5:
-            # The machine was asleep; give the open pages time to ping again.
-            with _lock:
-                for page_id in _pages:
-                    _pages[page_id] = now
-        last = now
-        if idle(now) and not jobs.active():
-            print("yapper-snip: page closed, stopping", flush=True)
-            os._exit(0)
+    def idle(self, now: float) -> bool:
+        """True once every page that was open has been gone for the grace period."""
+        with self._lock:
+            for page_id in [p for p, last in self._pages.items() if now - last > self.timeout]:
+                del self._pages[page_id]
+            if self._pages or not self._seen:
+                self._empty_since = None
+                return False
+            if self._empty_since is None:
+                self._empty_since = now
+            return now - self._empty_since >= self.grace

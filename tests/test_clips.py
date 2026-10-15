@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app import clips, config, export, ingest, main
+from app.lifecycle import EXIT_RESTART, Lifecycle
 from tests.test_audio import frames, tone  # noqa: F401
 
 CLIP_ID = "0123456789ab"
@@ -93,33 +94,18 @@ def test_purge_refused_while_job_runs(client, monkeypatch):
     assert client.get(f"/api/clips/{CLIP_ID}").status_code == 200
 
 
-def test_stop_and_restart(client, monkeypatch):
-    codes = []
-    monkeypatch.setattr(main, "_exit_soon", codes.append)
+def test_stop_restart_and_presence_routes(client, monkeypatch):
+    calls = []
+    fake = Lifecycle(exit_fn=lambda code, delay=0: calls.append(code), jobs_active=lambda: 0)
+    monkeypatch.setattr(main, "lifecycle", fake)
     monkeypatch.delenv("YAPPER_SUPERVISED", raising=False)
     assert client.post("/api/admin/restart", headers=ADMIN).status_code == 409
     monkeypatch.setenv("YAPPER_SUPERVISED", "1")
     assert client.post("/api/admin/restart", headers=ADMIN).status_code == 200
     assert client.post("/api/admin/stop", headers=ADMIN).status_code == 200
-    assert codes == [main.EXIT_RESTART, 0]
-
-
-def test_idle_only_after_last_page_leaves(client, monkeypatch):
-    presence = main.presence
-    monkeypatch.setattr(presence, "_pages", {})
-    monkeypatch.setattr(presence, "_seen", False)
-    monkeypatch.setattr(presence, "_empty_since", None)
-    assert not presence.idle(1000)  # never opened in a browser
-
-    presence.touch("a", now=0)
-    presence.touch("b", now=0)
+    assert calls == [EXIT_RESTART, 0]
+    assert client.post("/api/presence/a").status_code == 204
     assert client.post("/api/presence/a/bye").status_code == 204
-    assert not presence.idle(1)
-    assert not presence.idle(presence.TIMEOUT + 1)  # b stopped pinging
-    assert presence.idle(presence.TIMEOUT + 1 + presence.GRACE)
-
-    assert client.post("/api/presence/c").status_code == 204  # reload
-    assert not presence.idle(presence.TIMEOUT + 1 + presence.GRACE)
 
 
 def test_unknown_clip_and_traversal(client):

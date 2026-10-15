@@ -12,7 +12,8 @@ import urllib.request
 import webbrowser
 
 from . import clips, models
-from .config import EXIT_RESTART, HOST, PORT
+from .config import HOST, PORT
+from .lifecycle import EXIT_RESTART, SUPERVISED_ENV
 
 
 def is_up(url: str) -> bool:
@@ -41,7 +42,7 @@ def serve(host: str, port: int, open_browser: bool = False) -> int:
             webbrowser.open(url)
             return 0
         threading.Thread(target=open_when_up, args=(url,), daemon=True).start()
-    env = dict(os.environ, YAPPER_SUPERVISED="1")
+    env = dict(os.environ, **{SUPERVISED_ENV: "1"})
     command = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", host, "--port", str(port)]
     print(f"yapper-snip: {url}")
     while True:

@@ -1,5 +1,4 @@
 import logging
-import os
 import subprocess
 import sys
 import threading
@@ -10,15 +9,18 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import audio, clips, export, ingest, isolate, jobs, models, presence, tasks, transcribe, ytdlp_service
-from .config import EXIT_RESTART, WEB_DIR, load_settings, save_settings
+from . import audio, clips, export, ingest, isolate, jobs, models, tasks, transcribe, ytdlp_service
+from .config import WEB_DIR, load_settings, save_settings
+from .lifecycle import Lifecycle, NotSupervised, os_exit
+
+lifecycle = Lifecycle(exit_fn=os_exit, jobs_active=jobs.active)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # The pages ping every few seconds; keep that out of the access log.
     logging.getLogger("uvicorn.access").addFilter(lambda record: "/api/presence/" not in record.getMessage())
-    threading.Thread(target=presence.watch, daemon=True).start()
+    threading.Thread(target=lifecycle.watch, daemon=True).start()
     yield
 
 
@@ -210,23 +212,18 @@ def pick_folder(req: PickFolderRequest) -> dict:
 
 @app.post("/api/presence/{page_id}", status_code=204)
 def page_open(page_id: str) -> None:
-    presence.touch(page_id)
+    lifecycle.page_open(page_id)
 
 
 @app.post("/api/presence/{page_id}/bye", status_code=204)
 def page_closed(page_id: str) -> None:
-    presence.leave(page_id)
+    lifecycle.page_closed(page_id)
 
 
 def _admin(x_yapper: str | None = Header(default=None)) -> None:
     # A custom header keeps other web pages from triggering these with a plain form post.
     if x_yapper != "1":
         raise HTTPException(status_code=403, detail="Missing X-Yapper header")
-
-
-def _exit_soon(code: int) -> None:
-    # Leave time for the response to reach the client.
-    threading.Timer(0.3, os._exit, args=(code,)).start()
 
 
 def _purge(fn) -> dict:
@@ -249,15 +246,16 @@ def purge_models() -> dict:
 
 @app.post("/api/admin/stop", dependencies=[Depends(_admin)])
 def stop_app() -> dict:
-    _exit_soon(0)
+    lifecycle.stop()
     return {"stopping": True}
 
 
 @app.post("/api/admin/restart", dependencies=[Depends(_admin)])
 def restart_app() -> dict:
-    if os.environ.get("YAPPER_SUPERVISED") != "1":
-        raise HTTPException(status_code=409, detail="Restart needs the launcher: start the app with 'uv run python -m app'")
-    _exit_soon(EXIT_RESTART)
+    try:
+        lifecycle.restart()
+    except NotSupervised as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     return {"restarting": True}
 
 

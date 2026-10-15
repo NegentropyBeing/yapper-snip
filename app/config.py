@@ -16,9 +16,6 @@ DEFAULTS = {
     "normalize": False,
 }
 
-# Exit code the server uses to ask the launcher (python -m app) for a restart.
-# Not 3: uvicorn itself exits with 3 when it cannot start (e.g. the port is taken).
-EXIT_RESTART = 75
 HOST = "127.0.0.1"
 PORT = 8791
 
