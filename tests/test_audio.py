@@ -46,7 +46,7 @@ def test_cut_is_sample_accurate(tone, tmp_path):
 
 def test_cut_resample_mono_fade(tone, tmp_path):
     out = tmp_path / "cut.wav"
-    audio.cut(tone, out, 2.0, 7.0, sample_rate=24000, mono=True, fade_ms=5)
+    audio.cut(tone, out, 2.0, 7.0, audio.CutOptions(sample_rate=24000, mono=True, fade_ms=5))
     n, rate, channels = frames(out)
     assert (rate, channels) == (24000, 1)
     assert abs(n - 5 * 24000) <= 1
@@ -54,7 +54,7 @@ def test_cut_resample_mono_fade(tone, tmp_path):
 
 def test_cut_normalize(tone, tmp_path):
     out = tmp_path / "cut.wav"
-    audio.cut(tone, out, 2.0, 5.0, normalize=True)
+    audio.cut(tone, out, 2.0, 5.0, audio.CutOptions(normalize=True))
     assert audio.peak_db(out, 0, 3) == pytest.approx(audio.NORMALIZE_PEAK_DB, abs=0.2)
 
 

@@ -46,18 +46,6 @@ class ClipRequest(BaseModel):
     padding: float = 5.0
 
 
-class ExportRequest(BaseModel):
-    name: str
-    start: float
-    end: float
-    variant: str = "original"
-    sample_rate: int | None = None
-    mono: bool = False
-    fade_ms: float = 0
-    normalize: bool = False
-    transcript: str = ""
-
-
 class IsolateRequest(BaseModel):
     steps: list[str]
 
@@ -147,9 +135,9 @@ def clip_audio(clip_id: str, variant: str = "original") -> FileResponse:
 
 
 @app.post("/api/clips/{clip_id}/export")
-def export_clip(clip_id: str, req: ExportRequest) -> dict:
+def export_clip(clip_id: str, req: export.ExportSpec) -> dict:
     try:
-        return export.export(clip_id, load_settings()["output_dir"], **req.model_dump())
+        return export.export(clip_id, load_settings()["output_dir"], req)
     except KeyError:
         raise HTTPException(status_code=404, detail="Unknown clip or variant")
     except (ValueError, OSError, audio.AudioError) as exc:

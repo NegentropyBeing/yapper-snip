@@ -24,19 +24,15 @@ def _free_path(folder: Path, name: str) -> Path:
     return candidate
 
 
-def export(
-    clip_id: str,
-    output_dir: str,
-    name: str,
-    start: float,
-    end: float,
-    variant: str = "original",
-    sample_rate: int | None = None,
-    mono: bool = False,
-    fade_ms: float = 0,
-    normalize: bool = False,
-    transcript: str = "",
-) -> dict:
+class ExportSpec(audio.CutOptions):
+    name: str
+    start: float
+    end: float
+    variant: str = "original"
+    transcript: str = ""
+
+
+def export(clip_id: str, output_dir: str, spec: ExportSpec) -> dict:
     if not output_dir:
         raise ValueError("Choose an output folder first")
     folder = Path(output_dir)
@@ -44,16 +40,16 @@ def export(
         raise ValueError("The output folder must be an absolute path")
     folder.mkdir(parents=True, exist_ok=True)
 
-    src = clips.variant_path(clip_id, variant)
+    src = clips.variant_path(clip_id, spec.variant)
     meta = clips.load(clip_id)
-    start = max(0.0, start)
-    end = min(end, meta["duration"])
-    dst = _free_path(folder, safe_name(name))
-    audio.cut(src, dst, start, end, sample_rate=sample_rate, mono=mono, fade_ms=fade_ms, normalize=normalize)
+    start = max(0.0, spec.start)
+    end = min(spec.end, meta["duration"])
+    dst = _free_path(folder, safe_name(spec.name))
+    audio.cut(src, dst, start, end, spec)
 
     result = {"path": str(dst), **audio.probe(dst)}
-    if transcript.strip():
+    if spec.transcript.strip():
         text_path = dst.with_suffix(".txt")
-        text_path.write_text(transcript.strip() + "\n", encoding="utf-8")
+        text_path.write_text(spec.transcript.strip() + "\n", encoding="utf-8")
         result["transcript_path"] = str(text_path)
     return result

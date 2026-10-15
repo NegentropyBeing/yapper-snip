@@ -20,7 +20,7 @@ def run(src: Path, start: float, end: float) -> dict:
 
     with models.gpu(), tempfile.TemporaryDirectory() as tmp:
         segment = Path(tmp) / "segment.wav"
-        audio.cut(src, segment, start, end, sample_rate=16000, mono=True)
+        audio.cut(src, segment, start, end, audio.CutOptions(sample_rate=16000, mono=True))
         model = models.load(
             "whisper", lambda: whisper.load_model(MODEL_NAME, download_root=str(models.MODELS_DIR / "whisper"))
         )

@@ -3,12 +3,21 @@ import re
 import subprocess
 from pathlib import Path
 
+from pydantic import BaseModel
+
 WORK_SAMPLE_RATE = 48000
 NORMALIZE_PEAK_DB = -1.0
 
 
 class AudioError(RuntimeError):
     pass
+
+
+class CutOptions(BaseModel):
+    sample_rate: int | None = None
+    mono: bool = False
+    fade_ms: float = 0
+    normalize: bool = False
 
 
 def _run(args: list[str]) -> subprocess.CompletedProcess:
@@ -81,24 +90,22 @@ def cut(
     dst: Path,
     start: float,
     end: float,
-    sample_rate: int | None = None,
-    mono: bool = False,
-    fade_ms: float = 0,
-    normalize: bool = False,
+    options: CutOptions | None = None,
 ) -> None:
     """Cut [start, end) seconds from a PCM file. atrim is sample-accurate."""
+    options = options or CutOptions()
     if end <= start:
         raise ValueError("End must be after start")
     duration = end - start
     filters = [f"atrim=start={start:.6f}:end={end:.6f}", "asetpts=PTS-STARTPTS"]
-    if mono:
+    if options.mono:
         filters.append("aformat=channel_layouts=mono")
-    if normalize:
+    if options.normalize:
         gain = NORMALIZE_PEAK_DB - peak_db(src, start, end)
         filters.append(f"volume={gain:.2f}dB")
-    if sample_rate:
-        filters.append(f"aresample={int(sample_rate)}:resampler=soxr")
-    fade = min(fade_ms / 1000, duration / 2)
+    if options.sample_rate:
+        filters.append(f"aresample={options.sample_rate}:resampler=soxr")
+    fade = min(options.fade_ms / 1000, duration / 2)
     if fade > 0:
         filters.append(f"afade=t=in:st=0:d={fade:.4f}")
         filters.append(f"afade=t=out:st={duration - fade:.6f}:d={fade:.4f}")
