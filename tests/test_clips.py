@@ -4,7 +4,7 @@ import shutil
 import pytest
 from fastapi.testclient import TestClient
 
-from app import clips, config, main
+from app import clips, config, export, ingest, main
 from tests.test_audio import frames, tone  # noqa: F401
 
 CLIP_ID = "0123456789ab"
@@ -23,20 +23,20 @@ def client(tmp_path, monkeypatch, tone):  # noqa: F811
 
 
 def test_window_pads_and_clamps():
-    assert clips.window(3, 15, 5, 526) == (0.0, 20.0, 3, 15)
-    assert clips.window(520, None, 5, 526) == (515, 526, 520, 526)
+    assert ingest.window(3, 15, 5, 526) == (0.0, 20.0, 3, 15)
+    assert ingest.window(520, None, 5, 526) == (515, 526, 520, 526)
 
 
 @pytest.mark.parametrize("start, end", [(600, 610), (10, 10), (0, 2000)])
 def test_window_rejects(start, end):
     with pytest.raises(ValueError):
-        clips.window(start, end, 5, 3600 if end == 2000 else 526)
+        ingest.window(start, end, 5, 3600 if end == 2000 else 526)
 
 
 def test_safe_name():
-    assert clips.safe_name(' clo:vis/..\\take?.wav ') == "clovis..take"
+    assert export.safe_name(' clo:vis/..\\take?.wav ') == "clovis..take"
     with pytest.raises(ValueError):
-        clips.safe_name("...")
+        export.safe_name("...")
 
 
 def test_export_requires_output_folder(client):

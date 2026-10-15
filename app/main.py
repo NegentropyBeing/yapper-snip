@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import audio, clips, isolate, jobs, models, presence, transcribe, ytdlp_service
+from . import audio, clips, export, ingest, isolate, jobs, models, presence, transcribe, ytdlp_service
 from .config import EXIT_RESTART, WEB_DIR, load_settings, save_settings
 
 
@@ -101,7 +101,7 @@ def create_clip(req: ClipRequest) -> dict:
     if not 0 <= req.padding <= 60:
         raise HTTPException(status_code=400, detail="Padding must be between 0 and 60 seconds")
     url = req.url.strip()
-    job = jobs.submit("download", lambda job: clips.create(job, url, start, end, req.padding))
+    job = jobs.submit("download", lambda job: ingest.create(job, url, start, end, req.padding))
     return job.to_dict()
 
 
@@ -147,7 +147,7 @@ def clip_audio(clip_id: str, variant: str = "original") -> FileResponse:
 @app.post("/api/clips/{clip_id}/export")
 def export_clip(clip_id: str, req: ExportRequest) -> dict:
     try:
-        return clips.export(clip_id, load_settings()["output_dir"], **req.model_dump())
+        return export.export(clip_id, load_settings()["output_dir"], **req.model_dump())
     except KeyError:
         raise HTTPException(status_code=404, detail="Unknown clip or variant")
     except (ValueError, OSError, audio.AudioError) as exc:
@@ -173,7 +173,7 @@ def isolate_clip(clip_id: str, req: IsolateRequest) -> dict:
         raise HTTPException(status_code=400, detail="Choose at least one cleanup step")
 
     def work(job: jobs.Job) -> dict:
-        isolate.run(src, src.with_name("clean.wav"), req.steps, on_progress=job.update)
+        isolate.run(src, clips.new_variant_path(clip_id, "clean"), req.steps, on_progress=job.update)
         return {"clip_id": clip_id, "steps": req.steps}
 
     return jobs.submit("isolate", work).to_dict()
